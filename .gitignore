@@ -1,0 +1,27 @@
+# Exclude node modules and package build directories
+node_modules/
+dist/
+build/
+.next/
+out/
+
+# Python environment and cache exclusions
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local databases and dynamic storage files
+*.db
+*.sqlite
+chroma_db/
+.env
+.env.local
+
+# Operating system configuration footprints
+.DS_Store
+Thumbs.db
