@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { InteractiveMap } from './components/InteractiveMap';
 import { VoiceAssistant } from './components/VoiceAssistant';
 
@@ -10,6 +10,9 @@ interface CrowdMetrics {
 }
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
+/** Debounce delay for slider inputs to prevent API flooding (ms). */
+const SLIDER_DEBOUNCE_MS = 300;
 
 function App() {
 
@@ -33,7 +36,10 @@ function App() {
   const [ragStatus, setRagStatus] = useState<string>('');
   const [ragLoading, setRagLoading] = useState<boolean>(false);
 
-  const handleRouteTriggered = (target: string) => {
+  // Debounce timer ref — avoids firing API calls on every slider tick
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleRouteTriggered = useCallback((target: string) => {
     setSelectedDestination(target);
     setQueryText(target); // Populate transcript into query text field
     if (target.includes('zone a') || target.includes('section a')) {
@@ -41,13 +47,13 @@ function App() {
     } else if (target.includes('zone b') || target.includes('section b')) {
       setSelectedZone('ZoneB');
     }
-  };
+  }, []);
 
-  const handleZoneSelect = (zoneId: string) => {
+  const handleZoneSelect = useCallback((zoneId: string) => {
     setSelectedZone(zoneId);
-  };
+  }, []);
 
-  // Run calculation when parameters change (wrapped in useCallback for Code Quality)
+  // Core fetch logic extracted for reuse by debouncer
   const fetchCrowdMetrics = useCallback(async () => {
     setLoading(true);
     setErrorMsg('');
@@ -69,19 +75,32 @@ function App() {
       }
       const data = await response.json();
       setMetrics(data);
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Error communicating with backend.');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Error communicating with backend.';
+      setErrorMsg(message);
     } finally {
       setLoading(false);
     }
   }, [density, deviation, acousticDb, channelWidth]);
 
+  // Debounced effect — waits SLIDER_DEBOUNCE_MS after last param change
   useEffect(() => {
-    fetchCrowdMetrics();
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    debounceTimerRef.current = setTimeout(() => {
+      fetchCrowdMetrics();
+    }, SLIDER_DEBOUNCE_MS);
+
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
   }, [fetchCrowdMetrics]);
 
   // Handle custom interactive queries to the RAG backend
-  const handleRAGQuerySubmit = async (e?: React.FormEvent) => {
+  const handleRAGQuerySubmit = useCallback(async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!queryText.trim()) return;
 
@@ -115,14 +134,17 @@ function App() {
     } finally {
       setRagLoading(false);
     }
-  };
+  }, [queryText, userRole]);
 
-  // Extract protocols for enhanced display (Problem Statement Alignment)
-  const protocolMatch = apiResponse.match(/Protocol:\s*(.*)/);
-  const protocolText = protocolMatch ? protocolMatch[1] : null;
-  const displayResponse = protocolText 
-    ? apiResponse.replace(/Protocol:\s*(.*)/, '').trim() 
-    : apiResponse;
+  // Memoised protocol extraction — avoids recomputation on unrelated renders
+  const { protocolText, displayResponse } = useMemo(() => {
+    const match = apiResponse.match(/Protocol:\s*(.*)/);
+    const protocol = match ? match[1] : null;
+    const display = protocol
+      ? apiResponse.replace(/Protocol:\s*(.*)/, '').trim()
+      : apiResponse;
+    return { protocolText: protocol, displayResponse: display };
+  }, [apiResponse]);
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 p-6 md:p-8 font-sans">

@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, memo } from 'react';
 
 interface InteractiveMapProps {
   selectedDestination: string;
   onZoneSelect: (zoneId: string) => void;
 }
 
-export const InteractiveMap: React.FC<InteractiveMapProps> = ({ selectedDestination, onZoneSelect }) => {
+/** Interactive SVG stadium map with pan/zoom and keyboard-navigable zones. */
+const InteractiveMapInner: React.FC<InteractiveMapProps> = ({ selectedDestination, onZoneSelect }) => {
   const [matrix, setMatrix] = useState<number[]>([1, 0, 0, 1, 0, 0]); // Panning and zooming transform matrix
   const [activeZone, setActiveZone] = useState<string | null>(null);
 
@@ -23,28 +24,28 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({ selectedDestinat
   }, [selectedDestination, onZoneSelect]);
 
   // Pan using delta transform
-  const applyPan = (dx: number, dy: number) => {
+  const applyPan = useCallback((dx: number, dy: number) => {
     setMatrix(prev => [prev[0], prev[1], prev[2], prev[3], prev[4] + dx, prev[5] + dy]);
-  };
+  }, []);
 
   // Zoom scale boundary validation
-  const applyZoom = (factor: number) => {
+  const applyZoom = useCallback((factor: number) => {
     setMatrix(prev => {
       const newZoomX = prev[0] * factor;
       const newZoomY = prev[3] * factor;
       if (newZoomX < 0.5 || newZoomX > 4.0) return prev;
       return [newZoomX, prev[1], prev[2], newZoomY, prev[4], prev[5]];
     });
-  };
+  }, []);
 
-  const resetView = () => {
+  const resetView = useCallback(() => {
     setMatrix([1, 0, 0, 1, 0, 0]);
-  };
+  }, []);
 
-  const handleZoneInteraction = (zoneId: string) => {
+  const handleZoneInteraction = useCallback((zoneId: string) => {
     setActiveZone(zoneId);
     onZoneSelect(zoneId);
-  };
+  }, [onZoneSelect]);
 
   return (
     <div className="relative border border-slate-800/80 rounded-xl overflow-hidden bg-slate-950 shadow-2xl" role="region" aria-label="Interactive Stadium Map">
@@ -170,3 +171,6 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({ selectedDestinat
     </div>
   );
 };
+
+/** Memoised InteractiveMap — only re-renders when props change. */
+export const InteractiveMap = memo(InteractiveMapInner);
