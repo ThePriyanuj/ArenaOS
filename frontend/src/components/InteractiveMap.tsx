@@ -116,7 +116,13 @@ const InteractiveMapInner: React.FC<InteractiveMapProps> = ({ selectedDestinatio
         height="500px" 
         className="cursor-move"
         viewBox="0 0 800 600"
+        aria-labelledby="stadium-map-title stadium-map-desc"
+        role="group"
       >
+        <title id="stadium-map-title">Interactive Venue Seating Map</title>
+        <desc id="stadium-map-desc">
+          Keyboard-navigable vector SVG mapping Zone A (West Concourse) and Zone B (East Concourse). Seating zones are selectable for crowd density calculation.
+        </desc>
         <g transform={`matrix(${matrix.join(' ')})`}>
           {/* Main Stadium Outer Boundary */}
           <rect x="50" y="50" width="700" height="500" rx="100" fill="#1e293b" stroke="#334155" strokeWidth="8" />

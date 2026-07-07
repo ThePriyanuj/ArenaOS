@@ -148,6 +148,12 @@ function App() {
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 p-6 md:p-8 font-sans">
+      <a 
+        href="#main-content" 
+        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:p-3 focus:bg-blue-600 focus:text-white focus:rounded-lg focus:font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-900"
+      >
+        Skip to main content
+      </a>
       <header className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between border-b border-slate-800 pb-6">
         <div>
           <h1 className="text-3xl font-extrabold text-white tracking-tight">
@@ -193,7 +199,7 @@ function App() {
         </div>
       )}
 
-      <main className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <main id="main-content" className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Map Section */}
         <section className="lg:col-span-2 flex flex-col gap-6" aria-label="Stadium Layout">
           <div className="bg-slate-800/40 border border-slate-800/80 rounded-xl p-5 shadow-xl backdrop-blur-md">

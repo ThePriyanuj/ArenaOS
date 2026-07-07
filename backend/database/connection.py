@@ -19,6 +19,30 @@ load_dotenv()
 
 logger = logging.getLogger("arenaos.database")
 
+# Thread-safe global model instance to avoid class method LRU cache memory leaks (B019)
+_EMBEDDING_MODEL: Optional[SentenceTransformer] = None
+
+
+def get_embedding_model() -> SentenceTransformer:
+    """Retrieve or load the global SentenceTransformer model instance."""
+    global _EMBEDDING_MODEL
+    if _EMBEDDING_MODEL is None:
+        logger.info("Loading SentenceTransformer model (all-MiniLM-L6-v2)")
+        _EMBEDDING_MODEL = SentenceTransformer("all-MiniLM-L6-v2")
+    return _EMBEDDING_MODEL
+
+
+@lru_cache(maxsize=512)
+def _encode_query_cached(query_text: str) -> tuple[float, ...]:
+    """Compute and cache the embedding vector for a query string.
+
+    Module-level function prevents memory leaks associated with caching
+    instance methods (ruff rule B019).
+    """
+    model = get_embedding_model()
+    return tuple(model.encode(query_text).tolist())
+
+
 # Module-level seed data keeps the class initialiser focused on wiring
 SEED_PROTOCOLS: list[dict[str, str | dict[str, str]]] = [
     # Fan protocols
@@ -135,8 +159,7 @@ class VectorStorageManager:
         self.client = chromadb.PersistentClient(path=self.db_path)
 
         # Load SentenceTransformers model (384-dimensional embeddings)
-        logger.info("Loading SentenceTransformer model (all-MiniLM-L6-v2)")
-        self.embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+        self.embedding_model = get_embedding_model()
 
         self.collection = self.client.get_or_create_collection(
             "stadium_protocols"
@@ -173,19 +196,6 @@ class VectorStorageManager:
             embeddings=embeddings,
         )
 
-    @lru_cache(maxsize=128)
-    def _encode_query(self, query_text: str) -> tuple[float, ...]:
-        """Compute and cache the embedding vector for a query string.
-
-        Args:
-            query_text: The sanitized natural-language query.
-
-        Returns:
-            A tuple of floats representing the 384-dim embedding.
-            Tuples are used instead of lists to enable LRU caching.
-        """
-        return tuple(self.embedding_model.encode(query_text).tolist())
-
     def retrieve_grounded_context(
         self,
         sanitized_query: str,
@@ -206,7 +216,7 @@ class VectorStorageManager:
             A list of matched document strings, ordered by relevance.
             Returns an empty list when no documents match.
         """
-        query_vector = list(self._encode_query(sanitized_query))
+        query_vector = list(_encode_query_cached(sanitized_query))
 
         results = self.collection.query(
             query_embeddings=[query_vector],
